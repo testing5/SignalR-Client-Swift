@@ -42,7 +42,12 @@ public class JSONHubProtocol: HubProtocol {
         let messageType = try getMessageType(payload: payload)
             switch messageType {
             case .Invocation:
-                return try decoder.decode(ClientInvocationMessage.self, from: payload)
+                do {
+                    let target = try getMessageTarget(payload: payload)
+                    return RawClientInvocationMessage(payload: payload, target: target)
+                } catch {
+                    return try decoder.decode(ClientInvocationMessage.self, from: payload)
+                }
             case .StreamItem:
                 return try decoder.decode(StreamItemMessage.self, from: payload)
             case .Completion:
@@ -71,6 +76,19 @@ public class JSONHubProtocol: HubProtocol {
             return try decoder.decode(MessageTypeHelper.self, from: payload).type
         } catch {
             logger.log(logLevel: .error, message: "Getting messageType failed: \(error)")
+            throw SignalRError.protocolViolation(underlyingError: error)
+        }
+    }
+    
+    private func getMessageTarget(payload: Data) throws -> String {
+        struct MessageHelper: Decodable {
+            let target: String
+        }
+        
+        do {
+            return try decoder.decode(MessageHelper.self, from: payload).target
+        } catch {
+            logger.log(logLevel: .error, message: "Getting target failed: \(error)")
             throw SignalRError.protocolViolation(underlyingError: error)
         }
     }

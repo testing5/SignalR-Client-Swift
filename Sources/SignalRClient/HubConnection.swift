@@ -19,6 +19,7 @@ public class HubConnection: ConnectionDelegate {
     private let hubConnectionQueue: DispatchQueue
     private var pendingCalls = [String: ServerInvocationHandler]()
     private var callbacks = [String: (ArgumentExtractor) throws -> Void]()
+    private var rawCallbacks = [String: (Data) -> Void]()
     private var handshakeHandled = false
     private let logger: Logger
 
@@ -113,6 +114,21 @@ public class HubConnection: ConnectionDelegate {
             logger.log(logLevel: .warning, message: "Client side hub method '\(method)' was already registered and was overwritten")
         }
     }
+    
+    public func on(method: String, rawCallback: @escaping (Data) -> Void) {
+        logger.log(logLevel: .info, message: "Registering raw client side hub method: '\(method)'")
+        
+        var callbackRegistered = false
+        hubConnectionQueue.sync {
+            callbackRegistered = rawCallbacks.keys.contains(method)
+            rawCallbacks[method] = rawCallback
+        }
+        
+        if (callbackRegistered) {
+            logger.log(logLevel: .warning, message: "Client side hub method '\(method)' was already registered and was overwritten")
+        }
+    }
+
 
     /**
      Invokes a server side hub method in a fire-and-forget manner.
@@ -326,7 +342,11 @@ public class HubConnection: ConnectionDelegate {
                 case MessageType.StreamItem:
                     try handleStreamItem(message: incomingMessage as! StreamItemMessage)
                 case MessageType.Invocation:
-                    handleInvocation(message: incomingMessage as! ClientInvocationMessage)
+                    if let message = incomingMessage as? ClientInvocationMessage {
+                        handleInvocation(message: message)
+                    } else if let message = incomingMessage as? RawClientInvocationMessage {
+                        handleInvocation(rawMessage: message)
+                    }
                 case MessageType.Close:
                     connection.stop(stopError: SignalRError.serverClose(message: (incomingMessage as! CloseMessage).error))
                 case MessageType.Ping:
@@ -393,6 +413,22 @@ public class HubConnection: ConnectionDelegate {
             logger.log(logLevel: .error, message: "No handler registered for method \'\(message.target)\'")
         }
     }
+    
+    private func handleInvocation(rawMessage: RawClientInvocationMessage) {
+        var rawCallback: ( (Data) -> Void)?
+        self.hubConnectionQueue.sync {
+            rawCallback = self.rawCallbacks[rawMessage.target]
+        }
+        
+        if rawCallback != nil {
+            Util.dispatchToMainThread {
+                rawCallback!(rawMessage.payload)
+            }
+        } else {
+            logger.log(logLevel: .error, message: "No handler registered for method raw \'\(rawMessage.target)\'")
+        }
+    }
+
 
     private func hubConnectionDidClose(error: Error?) {
         logger.log(logLevel: .info, message: "HubConnection closing with error: \(String(describing: error))")
