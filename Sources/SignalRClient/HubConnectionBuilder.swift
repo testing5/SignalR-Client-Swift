@@ -118,7 +118,8 @@ public extension HubConnectionBuilder {
     /**
      A convenience method for configuring a `HubConnection` to use the `JSONHubProtocol`.
      */
-    func withJSONHubProtocol() -> HubConnectionBuilder {
-        return self.withHubProtocol(hubProtocolFactory: {logger in JSONHubProtocol(logger: logger)})
+    func withJSONHubProtocol(_ decoder: JSONDecoder) -> HubConnectionBuilder {
+        let jsonDecoder = decoder
+        return self.withHubProtocol(hubProtocolFactory: {logger in JSONHubProtocol(logger: logger, jsonDecoder: jsonDecoder)})
     }
 }

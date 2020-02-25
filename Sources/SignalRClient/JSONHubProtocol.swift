@@ -11,14 +11,15 @@ import Foundation
 public class JSONHubProtocol: HubProtocol {
     private static let recordSeparator = UInt8(0x1e)
     private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
+    private let decoder: JSONDecoder
     private let logger: Logger
     public let name = "json"
     public let version = 1
     public let type = ProtocolType.Text
 
-    public init(logger: Logger) {
+    public init(logger: Logger, jsonDecoder: JSONDecoder = JSONDecoder()) {
         self.logger = logger
+        self.decoder = jsonDecoder
     }
 
     public func parseMessages(input: Data) throws -> [HubMessage] {
