@@ -110,6 +110,17 @@ public class ClientInvocationMessage: HubMessage, Decodable {
     }
 }
 
+public class RawClientInvocationMessage: HubMessage {
+    public let type = MessageType.Invocation
+    public let payload: Data
+    public let target: String
+    
+    init (payload: Data, target: String) {
+        self.payload = payload
+        self.target = target
+    }
+}
+
 public class StreamItemMessage: HubMessage, Decodable {
     public let type = MessageType.StreamItem
     public let invocationId: String
